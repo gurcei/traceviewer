@@ -39,6 +39,7 @@ import javax.swing.JLabel;
 class TraceDetails
 {
     Map<Integer, String> mapFuncIds;
+    List<Integer> lstFIDs;
     String logfile;
     List<SampleDetails> lstSamples;
 
@@ -108,6 +109,7 @@ class TraceDetails
     {
         mapFuncIds = new HashMap<Integer, String>();
         lstSamples = new ArrayList<SampleDetails>();
+        lstFIDs = new ArrayList<Integer>();
 
         logfile = file;
 
@@ -126,6 +128,7 @@ class TraceDetails
                 int func_id = readInteger(ch);
                 String func_name = readString(ch, 128).trim();
                 mapFuncIds.put(func_id, func_name);
+                lstFIDs.add(func_id);
 
                 // allocate colour (if not allocated already
                 double mix = 0.6;
@@ -178,6 +181,11 @@ class TraceDetails
         return mapFuncIds.size();
     }
     
+    public int adj(int func_id)
+    {
+        return lstFIDs.indexOf(func_id);
+    }
+    
     public void figureOutLeftColWidth(JLabel lblGraphic)
     {
         int width = lblGraphic.getWidth();
@@ -196,7 +204,7 @@ class TraceDetails
         for (Integer func_id : mapFuncIds.keySet())
         {
             String func_name = mapFuncIds.get(func_id);
-            g2d.drawString(func_name, 0, (2 + func_id) * rowheight);
+            g2d.drawString(func_name, 0, (2 + adj(func_id)) * rowheight);
 
             int len = func_name.length();
             if (len > max_name_len)
@@ -212,7 +220,7 @@ class TraceDetails
     List<SampleDetails> lstVisibleSamples = new ArrayList<SampleDetails>();
     int detboxsize = 6;
 
-    public void Draw(JLabel lblGraphic, int zoom, int t_pos, int selstart, int selend, boolean showDetails)
+    public void Draw(JLabel lblGraphic, int zoom, long t_pos, long selstart, long selend, boolean showDetails)
     {
         int width = lblGraphic.getWidth();
         int height = lblGraphic.getHeight();
@@ -235,14 +243,14 @@ class TraceDetails
         {
             String func_name = mapFuncIds.get(func_id);
 
-            if (func_id == selrow)
+            if (adj(func_id) == selrow)
             {
                 g2d.setColor(Color.yellow);
-                g2d.fill(new Rectangle(0, (1 + func_id) * rowheight + 1, leftcolwidth, rowheight));
+                g2d.fill(new Rectangle(0, (1 + adj(func_id)) * rowheight + 1, leftcolwidth, rowheight));
                 g2d.setColor(Color.blue);
             }
-            g2d.drawString(func_name, 0, (2 + func_id) * rowheight - 2);
-            if (func_id == selrow)
+            g2d.drawString(func_name, 0, (2 + adj(func_id)) * rowheight - 2);
+            if (adj(func_id) == selrow)
                 g2d.setColor(Color.black);
         }
 
@@ -253,16 +261,18 @@ class TraceDetails
         g2d.drawLine(x-1, 0, x-1, height);
 
         // draw measure units in top row
-        int zdur = (int)( (width-leftcolwidth) / zm) + t_pos;
+        long zdur = (long)( (width-leftcolwidth) / zm) + t_pos;
 
-        int[] unit_options =
+        long[] unit_options =
             { 100, 200, 500,
               1000, 2000, 5000,
               10000, 20000, 50000,
               100000, 200000, 500000,
-              1000000, 2000000, 5000000 };
+              1000000, 2000000, 5000000,
+              10000000, 20000000, 50000000,
+              100000000, 200000000, 500000000};
 
-        int units = 0;
+        long units = 0;
         for (int k = 0; k < unit_options.length; k++)
         {
             units = unit_options[k];
@@ -275,18 +285,21 @@ class TraceDetails
         cliprect.setFrame(x, 0, width, height);
         g2d.setClip(cliprect);
 
-        int unit_cnt = 0;
-        int tick = 0;
-        for (int k = 0; k < zdur; k += units)
+        long unit_cnt = 0;
+        long tick = 0;
+        for (long k = 0; k < zdur; k += units)
         {
             // decide on us, ms or s units
             String s = "";
             if (units < 1000)
-                s = Integer.toString(tick*units) + "us";
+                s = Long.toString(tick*units) + "us";
             else if (units < 1000000)
-                s = Integer.toString(tick*units/1000) + "ms";
+                s = Long.toString(tick*units/1000) + "ms";
+            else if (units < 60000000)
+                s = Long.toString(tick*units/1000000) + "s";
             else
-                s = Integer.toString(tick*units/1000000) + "s";
+                s = Long.toString(tick*units/60000000) + "m";
+    
             g2d.drawString(s, x + (int)((tick * units - t_pos) * zm), fontheight);
             unit_cnt += units;
             tick++;
@@ -326,9 +339,9 @@ class TraceDetails
                 int ds = (int)start;
                 int dw = (int)time;
                 g2d.setColor(lstColors.get(s.func_id));
-                g2d.fill(new Rectangle(ds, y + s.func_id*rowheight, dw, fontheight));
+                g2d.fill(new Rectangle(ds, y + adj(s.func_id)*rowheight, dw, fontheight));
                 g2d.setColor(Color.black);
-                g2d.drawRect(ds, y + s.func_id*rowheight, dw, fontheight);
+                g2d.drawRect(ds, y + adj(s.func_id)*rowheight, dw, fontheight);
             }
 
             cnt++;
@@ -342,12 +355,12 @@ class TraceDetails
             int detx = timelineToScreenCoord(zoom, t_pos, (int)s.time_stamp);
             if (showDetails)
             {
-                g2d.fill(new Rectangle(detx-detboxsize/2, y + s.func_id*rowheight+rowheight/2-detboxsize/2, detboxsize+1, detboxsize+1));
+                g2d.fill(new Rectangle(detx-detboxsize/2, y + adj(s.func_id)*rowheight+rowheight/2-detboxsize/2, detboxsize+1, detboxsize+1));
 
                 if (s.sample_type == TYPE_EXIT)
                 {
                     // show the exit point number
-                    g2d.drawString(Integer.toString(s.exit_point), detx - fontwidth, y + s.func_id*rowheight+fontheight-1);
+                    g2d.drawString(Integer.toString(s.exit_point), detx - fontwidth, y + adj(s.func_id)*rowheight+fontheight-1);
                 }
             }
 
@@ -373,9 +386,9 @@ class TraceDetails
                     {
                         g2d.setColor(Color.yellow);
                         Rectangle2D rect = fm.getStringBounds(split[k], g2d);
-                        g2d.fillRect(detx, y + s.func_id*rowheight+35+k*rowheight - rowheight + 2, (int)rect.getWidth(), (int)rect.getHeight());
+                        g2d.fillRect(detx, y + adj(s.func_id)*rowheight+35+k*rowheight - rowheight + 2, (int)rect.getWidth(), (int)rect.getHeight());
                         g2d.setColor(Color.black);
-                        g2d.drawString(split[k], detx, y + s.func_id*rowheight+35+k*rowheight);
+                        g2d.drawString(split[k], detx, y + adj(s.func_id)*rowheight+35+k*rowheight);
                     }
                 }
             }
@@ -390,13 +403,14 @@ class TraceDetails
 
         if (selstart > selend)
         {
-            int tmp = selstart;
+            long tmp = selstart;
             selstart = selend;
             selend = tmp;
         }
         
         int selx = timelineToScreenCoord(zoom, t_pos, selstart);
         int selw = timelineToScreenCoord(zoom, t_pos, selend) - selx;
+        System.out.println("selstart=" + Long.toString(selstart) + "selx = " + Integer.toString(selx) + ", selw = " + selw);
         int sely = y;
         int selh = rowheight * lstStarts.length + 1;
         //System.out.println("selx="+selx+", sely="+sely+", selw="+selw+", selh="+selh);
@@ -417,26 +431,26 @@ class TraceDetails
         lblGraphic.setIcon(icon);
     }
 
-    public int findPrevSampleNodePos(int selstart)
+    public long findPrevSampleNodePos(long selstart)
     {
         for (int k = lstSamples.size()-1; k >= 0; k--)
         {
             SampleDetails s = lstSamples.get(k);
 
-            if (s.func_id == selrow && s.time_stamp < selstart)
+            if (adj(s.func_id) == selrow && s.time_stamp < selstart)
                 return (int) s.time_stamp;
         }
 
         return selstart;
     }
 
-    public int findNextSampleNodePos(int selstart)
+    public long findNextSampleNodePos(long selstart)
     {
         for (int k = 0; k < lstSamples.size(); k++)
         {
             SampleDetails s = lstSamples.get(k);
 
-            if (s.func_id == selrow && s.time_stamp > selstart)
+            if (adj(s.func_id) == selrow && s.time_stamp > selstart)
                 return (int) s.time_stamp;
         }
 
@@ -444,14 +458,14 @@ class TraceDetails
     }
 
     // this version just checks the cursor position for the current row against any sample points
-    public String findHoverText(int zoom, int t_pos, int selpos)
+    public String findHoverText(int zoom, long t_pos, long selpos)
     {
         if (selrow == -1)
             return null;
 
         for (SampleDetails s : lstVisibleSamples)
         {
-            if (s.func_id != selrow)
+            if (adj(s.func_id) != selrow)
                 continue;
 
             if (s.time_stamp == selpos)
@@ -479,7 +493,7 @@ class TraceDetails
         return null;
     }
     
-    public String findHoverText(int zoom, int t_pos, Point pt)
+    public String findHoverText(int zoom, long t_pos, Point pt)
     {
         int x = pt.x;
         int y = pt.y;
@@ -491,7 +505,7 @@ class TraceDetails
         {
             int detx = timelineToScreenCoord(zoom, t_pos, (int)s.time_stamp);
             int x1 = detx - detboxsize/2;
-            int y1 = topy + s.func_id*rowheight+rowheight/2-detboxsize/2;
+            int y1 = topy + adj(s.func_id)*rowheight+rowheight/2-detboxsize/2;
             int x2 = x1 + detboxsize;
             int y2 = y1 + detboxsize;
             
@@ -530,11 +544,11 @@ class TraceDetails
         }
     }
 
-    public int timelineToScreenCoord(int zoom, int x_pos, int val)
+    public int timelineToScreenCoord(int zoom, long x_pos, long val)
     {
         double zm = 100. / (double)zoom;
-        val = (int)((val - x_pos) * zm) + leftcolwidth;
-        return val;
+        val = (long)((val - x_pos) * zm) + leftcolwidth;
+        return (int)val;
     }
 
 }

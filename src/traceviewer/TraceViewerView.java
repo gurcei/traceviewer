@@ -164,16 +164,30 @@ public class TraceViewerView extends FrameView {
                         moveHorzScroll(scrlHorz.getMaximum() - scrlHorz.getBlockIncrement());
                     }
 
-                    if (e.getKeyCode() == KeyEvent.VK_UP && trace.selrow > -1)
+                    if (e.getKeyCode() == KeyEvent.VK_UP)
                     {
-                        trace.selrow--;
-                        drawTrace();
+                        if (e.isControlDown())
+                        {
+                            moveCurrentRowUp();
+                        }
+                        else if (trace.selrow > -1)
+                        {
+                            trace.selrow--;
+                            drawTrace();
+                        }
                     }
 
-                    if (e.getKeyCode() == KeyEvent.VK_DOWN && trace.selrow < trace.getRowCount()-1)
+                    if (e.getKeyCode() == KeyEvent.VK_DOWN)
                     {
-                        trace.selrow++;
-                        drawTrace();
+                        if (e.isControlDown())
+                        {
+                            moveCurrentRowDown();
+                        }
+                        else if (trace.selrow < trace.getRowCount()-1)
+                        {
+                            trace.selrow++;
+                            drawTrace();
+                        }
                     }
 
                     if (e.getKeyCode() == KeyEvent.VK_LEFT)
@@ -183,8 +197,8 @@ public class TraceViewerView extends FrameView {
                         else if (e.isAltDown())
                         {
                             // move cursor to previous sample node in row
-                            int prev_pos = trace.findPrevSampleNodePos(selend);
-                            int orig_pos = selend;
+                            long prev_pos = trace.findPrevSampleNodePos(selend);
+                            long orig_pos = selend;
                             if (e.isShiftDown())
                             {
                                 selend = prev_pos;
@@ -194,7 +208,7 @@ public class TraceViewerView extends FrameView {
                                 selstart = prev_pos;
                                 selend = selstart;
                             }
-                            moveHorzScroll(scrlHorz.getValue() + prev_pos - orig_pos);
+                            moveHorzScroll(scrlHorz.getValue() + (int)(prev_pos - orig_pos));
                         }
                         else
                             moveHorzScroll(scrlHorz.getValue() - scrlHorz.getUnitIncrement());
@@ -207,8 +221,8 @@ public class TraceViewerView extends FrameView {
                         else if (e.isAltDown())
                         {
                             // move cursor to previous sample node in row
-                            int next_pos = trace.findNextSampleNodePos(selend);
-                            int orig_pos = selend;
+                            long next_pos = trace.findNextSampleNodePos(selend);
+                            long orig_pos = selend;
                             if (e.isShiftDown())
                             {
                                 selend = next_pos;
@@ -218,7 +232,7 @@ public class TraceViewerView extends FrameView {
                                 selstart = next_pos;
                                 selend = selstart;
                             }
-                            moveHorzScroll(scrlHorz.getValue() + next_pos - orig_pos);
+                            moveHorzScroll(scrlHorz.getValue() + (int)(next_pos - orig_pos));
                         }
                         else
                             moveHorzScroll(scrlHorz.getValue() + scrlHorz.getUnitIncrement());
@@ -233,6 +247,33 @@ public class TraceViewerView extends FrameView {
 
         ToolTipManager.sharedInstance().setInitialDelay(0);
     }
+
+    public void moveCurrentRowDown()
+    {
+        if (trace.selrow < trace.lstFIDs.size()-1)
+        {
+            int val1 = trace.lstFIDs.get(trace.selrow);
+            int val2 = trace.lstFIDs.get(trace.selrow+1);
+            trace.lstFIDs.set(trace.selrow, val2);
+            trace.lstFIDs.set(trace.selrow+1, val1);
+        }
+        trace.selrow++;
+        drawTrace();
+    }
+
+    public void moveCurrentRowUp()
+    {
+        if (trace.selrow > 0)
+        {
+            int val1 = trace.lstFIDs.get(trace.selrow-1);
+            int val2 = trace.lstFIDs.get(trace.selrow);
+            trace.lstFIDs.set(trace.selrow-1, val2);
+            trace.lstFIDs.set(trace.selrow, val1);
+        }
+        trace.selrow--;
+        drawTrace();
+    }
+
 
     final class FileDropHandler extends TransferHandler {
         TraceViewerView parent;
@@ -285,10 +326,12 @@ public class TraceViewerView extends FrameView {
         y = prefs.getInt("WindowY", -1);
         w = prefs.getInt("WindowWidth", -1);
         h = prefs.getInt("WindowHeight", -1);
-        selstart = prefs.getInt("selstart", 0);
-        selend = prefs.getInt("selend", 0);
+        selstart = prefs.getLong("selstart", 0);
+        selend = prefs.getLong("selend", 0);
         zoom = prefs.getInt("zoom", 128);
-        t_pos = prefs.getInt("t_pos", 0);
+        if (zoom == 0)
+            zoom = 128;
+        t_pos = prefs.getLong("t_pos", 0);
         String default_trace = prefs.get("DefaultTraceFile", null);
         if (default_trace == null || default_trace.length() == 0)
         {
@@ -328,10 +371,10 @@ public class TraceViewerView extends FrameView {
         prefs.put("WindowY", Integer.toString(this.getFrame().getY()));
         prefs.put("WindowWidth", Integer.toString(this.getFrame().getWidth()));
         prefs.put("WindowHeight", Integer.toString(this.getFrame().getHeight()));
-        prefs.putInt("selstart", selstart);
-        prefs.putInt("selend", selend);
+        prefs.putLong("selstart", selstart);
+        prefs.putLong("selend", selend);
         prefs.putInt("zoom", zoom);
-        prefs.putInt("t_pos", t_pos);
+        prefs.putLong("t_pos", t_pos);
         if (jTraceChooser.getSelectedFile() != null)
             prefs.put("DefaultTraceFile", jTraceChooser.getSelectedFile().getAbsolutePath());
         prefs.put("Browser", strBrowser);
@@ -370,6 +413,7 @@ public class TraceViewerView extends FrameView {
         optionsMenu = new javax.swing.JMenu();
         mnuZoomIn = new javax.swing.JMenuItem();
         mnuZoomOut = new javax.swing.JMenuItem();
+        mnuResetZoom = new javax.swing.JMenuItem();
         jSeparator1 = new javax.swing.JPopupMenu.Separator();
         mnuShowDetails = new javax.swing.JCheckBoxMenuItem();
         javax.swing.JMenu helpMenu = new javax.swing.JMenu();
@@ -502,6 +546,15 @@ public class TraceViewerView extends FrameView {
         });
         optionsMenu.add(mnuZoomOut);
 
+        mnuResetZoom.setText(resourceMap.getString("mnuResetZoom.text")); // NOI18N
+        mnuResetZoom.setName("mnuResetZoom"); // NOI18N
+        mnuResetZoom.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                mnuResetZoomActionPerformed(evt);
+            }
+        });
+        optionsMenu.add(mnuResetZoom);
+
         jSeparator1.setName("jSeparator1"); // NOI18N
         optionsMenu.add(jSeparator1);
 
@@ -575,7 +628,7 @@ public class TraceViewerView extends FrameView {
             .addGroup(statusPanelLayout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(statusMessageLabel)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 374, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 388, Short.MAX_VALUE)
                 .addComponent(progressBar, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(statusAnimationLabel)
@@ -616,12 +669,12 @@ public class TraceViewerView extends FrameView {
         return (int)trace.lstSamples.get(idx).time_stamp;
     }
 
-    int t_pos = 0;
+    long t_pos = 0;
     private void setScrollBars()
     {
         scrlHorz.setMinimum(0);
         scrlHorz.setMaximum(findLargestTimestamp());
-        scrlHorz.setValue(t_pos);
+        scrlHorz.setValue((int)t_pos);
 
         double zm = 100. / (double)zoom;
         int width = lblGraphic.getWidth() - trace.leftcolwidth;
@@ -710,8 +763,8 @@ public class TraceViewerView extends FrameView {
         }
     }//GEN-LAST:event_scrlHorzAdjustmentValueChanged
 
-    int selstart = 0;
-    int selend = 0;
+    long selstart = 0;
+    long selend = 0;
     boolean selectionInProgress = false;
     
     private void lblGraphicMousePressed(java.awt.event.MouseEvent evt)//GEN-FIRST:event_lblGraphicMousePressed
@@ -723,11 +776,11 @@ public class TraceViewerView extends FrameView {
         drawTrace();
     }//GEN-LAST:event_lblGraphicMousePressed
 
-    private int screenToTimelineCoord(int val)
+    private int screenToTimelineCoord(long val)
     {
         double zm = 100. / (double)zoom;
-        val = (int)( (val-trace.leftcolwidth) / zm) + t_pos;
-        return val;
+        val = (long)( (val-trace.leftcolwidth) / zm) + t_pos;
+        return (int)val;
     }
 
     private void lblGraphicMouseReleased(java.awt.event.MouseEvent evt)//GEN-FIRST:event_lblGraphicMouseReleased
@@ -758,7 +811,7 @@ public class TraceViewerView extends FrameView {
     {
         String prefix = "Duration = ";
 
-        int duration = selend - selstart;
+        long duration = selend - selstart;
 
         if (duration == 0)
         {
@@ -766,25 +819,26 @@ public class TraceViewerView extends FrameView {
             duration = selstart;
         }
         
-        int[] unit_options =
-            { 1, 1000, 1000000, 60000000 };
-        String[] unit_names = { "us", "ms", "s", "m" };
+        long[] unit_options =
+            //us, ms,    s,        m,         h
+            { 1L, 1000L, 1000000L, 60000000L, 3600000000L };
+        String[] unit_names = { "us", "ms", "s", "m", "h" };
 
-        int units = 0;
+        long units = 0;
         String unit_name = "";
-        int abs_dur = duration;
+        long abs_dur = duration;
         if (abs_dur < 0) abs_dur = -abs_dur;
         for (int k = 0; k < unit_options.length; k++)
         {
             units = unit_options[k];
             unit_name = unit_names[k];
-            if (abs_dur < unit_options[k+1])
+            if (k < unit_options.length-1 && abs_dur < unit_options[k+1])
                 break;
         }
 
         String sdur = "";
         if (units == 1)
-            sdur = Integer.toString(duration);
+            sdur = Long.toString(duration);
         else
             sdur = String.format("%.1f", (double)duration / (double)units);
         statusMessageLabel.setText(prefix + sdur + unit_name);
@@ -860,6 +914,27 @@ public class TraceViewerView extends FrameView {
         lblGraphic.setIcon(null);
     }//GEN-LAST:event_mainPanelComponentResized
 
+private void mnuResetZoomActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_mnuResetZoomActionPerformed
+        if (trace == null)
+            return;
+
+        // figure out new t_pos to keep everything centred
+        t_pos = (selstart+selend) / 2;
+
+        zoom = 128;
+
+        // now move it back to centre after the zoom is applied
+        t_pos = screenToTimelineCoord(trace.leftcolwidth - trace.traceareawidth / 2);
+
+        if (t_pos < 0)
+            t_pos = 0;
+
+        disableRefreshFlag = true;
+        setScrollBars();
+        disableRefreshFlag = false;
+        drawTrace();
+}//GEN-LAST:event_mnuResetZoomActionPerformed
+
     @Action
     public void actionExit()
     {
@@ -876,6 +951,7 @@ public class TraceViewerView extends FrameView {
     private javax.swing.JMenuItem mnuContents;
     private javax.swing.JMenuItem mnuOpenTrace;
     private javax.swing.JMenuItem mnuReportBug;
+    private javax.swing.JMenuItem mnuResetZoom;
     private javax.swing.JCheckBoxMenuItem mnuShowDetails;
     private javax.swing.JMenuItem mnuUpdateHistory;
     private javax.swing.JMenuItem mnuZoomIn;
